@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>ULTRA DEPARTMENT STORE — CATCH & WIN</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@400;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{--yellow:#FFE600;--white:#F2EDE4;--purple:#9B59FF;}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Noto Sans KR',sans-serif;cursor:none;user-select:none;background:#0a081c;}
+
+/* LAYERS */
+#bgLayer{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;background-size:cover;background-position:center top;background-repeat:no-repeat;}
+#bgOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(10,8,28,0);z-index:1;}
+canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointer-events:none;}
+
+/* BAG MASK: 배경과 완전히 동일한 사이즈/위치로 덮어서 쇼핑백 마스크 */
+#bagMask{position:fixed;top:0;left:0;width:100%;height:100%;z-index:25;pointer-events:none;
+  background-image:url('shopping_bag_full.png');
+  background-size:cover;
+  background-position:center top;
+  background-repeat:no-repeat;}
+
+/* TIMER */
+#timerDisplay{position:fixed;top:12px;left:50%;transform:translateX(-50%);font-family:'Bebas Neue',sans-serif;font-size:clamp(24px,3vw,48px);letter-spacing:.15em;color:var(--yellow);z-index:200;pointer-events:none;text-shadow:0 0 20px rgba(255,230,0,.5);display:none;}
+#timerDisplay.warning{color:#FF3B3B;text-shadow:0 0 20px rgba(255,59,59,.5);animation:timerPulse .5s ease-in-out infinite;}
+@keyframes timerPulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* STATUS */
+#wsStatus{position:fixed;top:12px;right:20px;font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:.2em;padding:4px 14px;z-index:200;border:1px solid;transition:all .3s;}
+#wsStatus.connected{color:#39FF14;border-color:#39FF14;background:rgba(57,255,20,.08);}
+#wsStatus.disconnected{color:#FF3B3B;border-color:#FF3B3B;background:rgba(255,59,59,.08);}
+#wsStatus.demo{color:#FFE600;border-color:#FFE600;background:rgba(255,230,0,.08);}
+
+/* BRAND */
+#brand{position:fixed;bottom:20px;right:28px;font-family:'Bebas Neue',sans-serif;font-size:clamp(12px,1.6vw,18px);letter-spacing:.18em;color:rgba(255,230,0,.2);z-index:20;pointer-events:none;line-height:1.1;text-align:right;}
+#brand span{display:block;font-size:.55em;letter-spacing:.4em;}
+
+/* BANNERS */
+#bannerZone{position:fixed;top:0;left:0;right:0;z-index:90;pointer-events:none;}
+.win-banner{width:100%;padding:0 24px;height:0;overflow:hidden;display:flex;align-items:center;gap:14px;font-family:'Bebas Neue',sans-serif;font-size:clamp(11px,1.4vw,18px);letter-spacing:.15em;transition:height .35s cubic-bezier(.22,1,.36,1);border-bottom:1px solid transparent;backdrop-filter:blur(10px);}
+.win-banner.show{height:clamp(36px,4.5vh,52px);}
+.win-banner .rank-img{height:clamp(24px,3vh,38px);width:auto;flex-shrink:0;filter:drop-shadow(0 0 8px currentColor);animation:rankBounce .4s cubic-bezier(.175,.885,.32,1.275) forwards;transform:scale(0);}
+@keyframes rankBounce{to{transform:scale(1);}}
+.win-banner .player-tag{font-size:clamp(13px,1.8vw,22px);letter-spacing:.1em;}
+.win-banner .prize-name{font-size:clamp(12px,1.6vw,20px);letter-spacing:.08em;opacity:.85;}
+.win-banner .staff-msg{margin-left:auto;font-size:clamp(9px,1vw,13px);letter-spacing:.12em;opacity:.4;flex-shrink:0;}
+
+/* CURSORS */
+.player-cursor{position:fixed;pointer-events:none;z-index:80;transform:translate(-50%,-50%);transition:left .08s linear,top .08s linear;}
+.cursor-ring{width:var(--cursor-size,50px);height:var(--cursor-size,50px);border-radius:50%;border:4px solid var(--col);box-shadow:0 0 30px var(--col),inset 0 0 12px rgba(0,0,0,.4);position:relative;animation:cPulse 2s ease-in-out infinite;}
+.cursor-dot{width:20px;height:20px;border-radius:50%;background:var(--col);box-shadow:0 0 16px var(--col);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);}
+.cursor-label{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:.2em;color:var(--col);white-space:nowrap;}
+@keyframes cPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.cursor-ring.catching{animation:none;transform:scale(1.8);transition:transform .1s;}
+
+/* ATTRACT SCREEN */
+#attractScreen{position:fixed;top:0;left:0;width:100%;height:100%;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,8,28,.78);backdrop-filter:blur(6px);transition:opacity .6s;overflow-y:auto;padding:20px 0;}
+#attractScreen.hidden{opacity:0;pointer-events:none;}
+.attract-logo{font-family:'Bebas Neue',sans-serif;font-size:clamp(48px,14vh,120px);color:var(--yellow);letter-spacing:.04em;line-height:.88;text-align:center;text-shadow:0 0 60px rgba(255,230,0,.8),0 0 120px rgba(255,230,0,.3),5px 5px 0 rgba(180,0,180,.5);animation:logoPulse 3s ease-in-out infinite;}
+@keyframes logoPulse{0%,100%{text-shadow:0 0 60px rgba(255,230,0,.8),0 0 120px rgba(255,230,0,.3),5px 5px 0 rgba(180,0,180,.5);}50%{text-shadow:0 0 90px rgba(255,230,0,1),0 0 180px rgba(255,230,0,.5),7px 7px 0 rgba(200,0,200,.7);}}
+.attract-sub{font-family:'Bebas Neue',sans-serif;font-size:clamp(10px,2vh,16px);letter-spacing:.6em;color:rgba(242,237,228,.55);margin:4px 0 0;}
+.attract-icons{display:flex;gap:12px;margin:10px 0;align-items:center;}
+.attract-icons img{width:clamp(28px,4vh,48px);height:auto;animation:iconFloat 2s ease-in-out infinite;filter:drop-shadow(0 0 10px rgba(255,230,0,.45));}
+.attract-icons img:nth-child(2n){animation-delay:.3s;}
+.attract-icons img:nth-child(3n){animation-delay:.6s;}
+@keyframes iconFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.attract-cta{font-family:'Bebas Neue',sans-serif;font-size:clamp(14px,3vh,24px);letter-spacing:.35em;color:#0a081c;background:var(--yellow);border:none;padding:10px 40px;clip-path:polygon(10px 0%,100% 0%,calc(100% - 10px) 100%,0% 100%);animation:ctaFloat 1.8s ease-in-out infinite;cursor:pointer;}
+.attract-cta:hover{background:#fff;}
+@keyframes ctaFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.attract-prizes{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:center;}
+.prize-chip{display:flex;align-items:center;gap:5px;font-family:'Bebas Neue',sans-serif;font-size:clamp(8px,1.5vh,12px);letter-spacing:.12em;padding:4px 10px;border:1.5px solid rgba(255,255,255,.12);color:rgba(242,237,228,.6);}
+.prize-chip img{height:clamp(14px,2vh,20px);width:auto;}
+
+/* WIN SPLASH */
+#winOverlay{position:fixed;top:0;left:0;width:100%;height:100%;z-index:70;pointer-events:none;}
+.win-splash{position:absolute;display:flex;flex-direction:column;align-items:center;opacity:0;}
+.win-splash img.rank-big{width:clamp(80px,8vw,160px);height:auto;filter:drop-shadow(0 0 30px rgba(255,230,0,.9));animation:rankSpin .6s cubic-bezier(.175,.885,.32,1.275) forwards;transform:rotate(-15deg) scale(0);}
+@keyframes rankSpin{to{transform:rotate(0deg) scale(1);}}
+.win-splash .prize-text{font-family:'Bebas Neue',sans-serif;font-size:clamp(14px,1.8vw,26px);letter-spacing:.2em;color:#fff;margin-top:8px;text-align:center;text-shadow:0 0 16px rgba(255,230,0,.7);}
+.win-splash .staff-note{font-size:clamp(9px,0.8vw,13px);letter-spacing:.15em;color:rgba(255,255,255,.4);margin-top:4px;}
+
+#explosionLayer{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50;}
+.scanlines{position:fixed;top:0;left:0;width:100%;height:100%;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.04) 3px,rgba(0,0,0,.04) 6px);pointer-events:none;z-index:99;}
+
+/* ADMIN */
+#adminToggle{position:fixed;bottom:20px;left:20px;background:rgba(255,230,0,.08);border:1px solid rgba(255,230,0,.2);color:rgba(255,230,0,.35);font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:.2em;padding:7px 13px;cursor:pointer;z-index:200;}
+#adminPanel{position:fixed;bottom:58px;left:20px;width:340px;background:rgba(10,8,28,.97);border:1px solid rgba(242,237,228,.1);z-index:200;padding:18px;display:none;max-height:80vh;overflow-y:auto;}
+#adminPanel.open{display:block;}
+.ap-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.3em;color:var(--yellow);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(242,237,228,.1);}
+.ap-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.ap-row label{font-size:11px;letter-spacing:.15em;color:rgba(242,237,228,.4);}
+.ap-row input[type=number],.ap-row input[type=text],.ap-row select{background:rgba(242,237,228,.05);border:1px solid rgba(242,237,228,.15);color:var(--white);padding:3px 7px;font-size:11px;}
+.ap-row input[type=number]{width:80px;text-align:right;}
+.ap-row input[type=text]{width:120px;}
+.ap-row select{width:140px;}
+.ap-sec{font-family:'Bebas Neue',sans-serif;font-size:10px;letter-spacing:.3em;color:rgba(242,237,228,.2);margin:11px 0 5px;}
+.ap-btn{font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:.2em;width:100%;padding:8px;margin-top:4px;cursor:pointer;border:1px solid rgba(242,237,228,.18);background:transparent;color:var(--white);}
+.ap-btn:hover{background:rgba(242,237,228,.07);}
+.ap-info{font-size:10px;color:rgba(242,237,228,.3);margin-top:4px;letter-spacing:.05em;line-height:1.6;}
+</style>
+</head>
+<body>
+
+<!-- BACKGROUND -->
+<div id="bgLayer"></div>
+<div id="bgOverlay"></div>
+
+<!-- GAME CANVAS -->
+<canvas id="game"></canvas>
+<!-- <div class="scanlines"></div> -->
+
+<!-- BAG MASK: 보라색 쇼핑백 연장 (배경 쇼핑백과 이어짐) -->
+<div id="bagMask"></div>
+
+<!-- EFFECTS -->
+<div id="explosionLayer"></div>
+<div id="winOverlay"></div>
+<div id="bannerZone"></div>
+
+<!-- BRAND -->
+<div id="brand">ULTRA DEPARTMENT STORE<span>CATCH &amp; WIN</span></div>
+
+<!-- TIMER -->
+<div id="timerDisplay"></div>
+
+<!-- STATUS -->
+<div id="wsStatus" class="disconnected">● LIDAR 연결 대기중</div>
+
+<!-- ATTRACT SCREEN -->
+<div id="attractScreen">
+  <div class="attract-logo">CATCH<br>&amp; WIN</div>
+  <div class="attract-sub">ULTRA DEPARTMENT STORE</div>
+  <div class="attract-icons" id="attractIcons"></div>
+  <button class="attract-cta" id="startBtn">체험 시작 · START</button>
+  <div class="attract-prizes" id="prizeChips"></div>
+</div>
+
+<!-- ADMIN PANEL -->
+<button id="adminToggle" onclick="toggleAdmin()">ADMIN</button>
+<div id="adminPanel">
+  <div class="ap-title">ADMIN PANEL</div>
+
+  <div class="ap-sec">WebSocket 연결</div>
+  <div class="ap-row"><label>서버 포트</label><input type="number" id="wsPort" value="8765" min="1000" max="9999"></div>
+  <button class="ap-btn" onclick="reconnectWS()">재연결</button>
+  <button class="ap-btn" onclick="startDemoMode()">데모모드 (마우스)</button>
+
+  <div class="ap-sec">배경 선택</div>
+  <div class="ap-row"><label>배경</label>
+    <select id="bgSelect" onchange="changeBG()">
+      <option value="">없음 (검정)</option>
+      <option value="BG01.png" selected>BG01</option>
+      <option value="BG02.png">BG02</option>
+      <option value="BG03.png">BG03</option>
+      <option value="BG04.png">BG04</option>
+      <option value="BG05.png">BG05</option>
+      <option value="BG06.png">BG06</option>
+      <option value="BG07.png">BG07</option>
+    </select>
+  </div>
+  <div class="ap-row"><label>오버레이 투명도</label><input type="number" id="overlayAlpha" value="35" min="0" max="100" step="5" onchange="updateOverlay()"></div>
+
+  <div class="ap-sec">상단 마스크 (오브젝트 페이드인)</div>
+  <div class="ap-row"><label>마스크 높이(vh)</label><input type="number" id="maskHeight" value="12" min="0" max="40" step="1" onchange="updateMask()"></div>
+  <div class="ap-row"><label>마스크 표시</label>
+    <select id="maskVisible" onchange="updateMask()">
+      <option value="1">표시</option>
+      <option value="0">숨김</option>
+    </select>
+  </div>
+
+  <div class="ap-sec">당첨 확률 (%)</div>
+  <div class="ap-row"><label>1등</label><input type="number" id="p1" value="0.3" min="0" max="100" step="0.1"></div>
+  <div class="ap-row"><label>2등</label><input type="number" id="p2" value="0.7" min="0" max="100" step="0.1"></div>
+  <div class="ap-row"><label>3등</label><input type="number" id="p3" value="4" min="0" max="100" step="0.1"></div>
+  <div class="ap-row"><label>4등</label><input type="number" id="p4" value="15" min="0" max="100" step="0.1"></div>
+  <div class="ap-row"><label>5등</label><input type="number" id="p5" value="80" min="0" max="100" step="0.1"></div>
+
+  <div class="ap-sec">경품명</div>
+  <div class="ap-row"><label>1등</label><input type="text" id="pr1" value="1등"></div>
+  <div class="ap-row"><label>2등</label><input type="text" id="pr2" value="2등"></div>
+  <div class="ap-row"><label>3등</label><input type="text" id="pr3" value="3등"></div>
+  <div class="ap-row"><label>4등</label><input type="text" id="pr4" value="4등"></div>
+  <div class="ap-row"><label>5등</label><input type="text" id="pr5" value="5등"></div>
+
+  <div class="ap-sec">게임 모드</div>
+  <div class="ap-row"><label>모드</label>
+    <select id="gameMode">
+      <option value="infinite" selected>무한 모드</option>
+      <option value="timer">타이머 모드</option>
+    </select>
+  </div>
+  <div class="ap-row"><label>제한 시간(분)</label><input type="number" id="timeLimit" value="5" min="1" max="30" step="1"></div>
+
+  <div class="ap-sec">게임 설정</div>
+  <div class="ap-row"><label>오브젝트 수</label><input type="number" id="objCount" value="20" min="6" max="50"></div>
+  <div class="ap-row"><label>아이콘 크기(px)</label><input type="number" id="iconSize" value="120" min="20" max="300"></div>
+  <div class="ap-row"><label>낙하 속도 (0.5~5)</label><input type="number" id="speedMult" value="2.0" min="0.3" max="5" step="0.1"></div>
+  <div class="ap-row"><label>좌우 흔들림</label><input type="number" id="swayAmount" value="0.8" min="0" max="3" step="0.1"></div>
+  <div class="ap-row"><label>당첨이미지 크기(px)</label><input type="number" id="winSize" value="120" min="30" max="300"></div>
+  <div class="ap-row"><label>커서 크기(px)</label><input type="number" id="cursorSize" value="50" min="20" max="300" step="10" onchange="updateCursorSize()"></div>
+  <div class="ap-row"><label>당첨 쿨타임(초)</label><input type="number" id="cooldown" value="1" min="0" max="60"></div>
+
+  <div class="ap-sec">라이다 캘리브레이션</div>
+  <div class="ap-row"><label>감지영역 X시작(m)</label><input type="number" id="lidarX1" value="-3.0" step="0.5"></div>
+  <div class="ap-row"><label>감지영역 X끝(m)</label><input type="number" id="lidarX2" value="3.0" step="0.5"></div>
+  <div class="ap-row"><label>감지영역 Y시작(m)</label><input type="number" id="lidarY1" value="0.5" step="0.5"></div>
+  <div class="ap-row"><label>감지영역 Y끝(m)</label><input type="number" id="lidarY2" value="5.0" step="0.5"></div>
+  <div class="ap-info">* X: 좌우 범위, Y: 라이다~화면 거리 범위</div>
+
+  <div class="ap-sec">테스트</div>
+  <button class="ap-btn" onclick="testWin(1)">1등 강제 당첨</button>
+  <button class="ap-btn" onclick="testWin(2)">2등 강제 당첨</button>
+  <button class="ap-btn" onclick="testWin(3)">3등 강제 당첨</button>
+  <button class="ap-btn" onclick="testWin(4)">4등 강제 당첨</button>
+  <button class="ap-btn" onclick="testWin(5)">5등 강제 당첨</button>
+  <button class="ap-btn" onclick="initObjects()">오브젝트 리셋</button>
+
+  <div class="ap-sec">설정 저장/불러오기</div>
+  <button class="ap-btn" onclick="saveSettings()">현재 설정 저장</button>
+  <button class="ap-btn" onclick="loadSettings()">저장된 설정 불러오기</button>
+
+  <button class="ap-btn" style="margin-top:12px;" onclick="toggleAdmin()">닫기</button>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  ULTRA DEPARTMENT STORE — CATCH & WIN (납품용)
+// ══════════════════════════════════════════════
+
+// ── IMAGE PATHS (외부 파일 참조) ──
+const OBJ_IMAGES = [];
+for(let i=1; i<=19; i++) OBJ_IMAGES.push(i+'.png');
+
+const RANK_IMAGES = [null, '1등.png', '2등.png', '3등.png', '4등.png', '5등.png'];
+
+// 등수별 아이콘 그룹 (당첨 시 이 중 랜덤 표시)
+const RANK_OBJ_GROUPS = {
+  1: [7, 6, 3, 11],    // 1등: 캐릭터 4종
+  2: [14, 15, 12, 19],  // 2등: 코인+선물상자
+  3: [16, 15, 6, 11],   // 3등: 선물상자+코인+캐릭터
+  4: [12, 14, 9, 4, 17, 18], // 4등
+  5: [12, 14, 9, 4, 17, 18], // 5등
+};
+
+// Preload all images
+const loadedImgs = {};
+let imagesLoaded = 0;
+const totalImages = OBJ_IMAGES.length + 5; // 19 objects + 5 ranks
+
+function preloadAll(callback){
+  function onLoad(){ imagesLoaded++; if(imagesLoaded>=totalImages && callback) callback(); }
+  OBJ_IMAGES.forEach((src,i)=>{
+    const img = new Image();
+    img.onload = onLoad;
+    img.onerror = onLoad;
+    img.src = src;
+    loadedImgs['obj_'+i] = img;
+  });
+  for(let r=1; r<=5; r++){
+    const img = new Image();
+    img.onload = onLoad;
+    img.onerror = onLoad;
+    img.src = RANK_IMAGES[r];
+    loadedImgs['rank_'+r] = img;
+  }
+}
+
+// ── CANVAS SETUP ──
+const gameCanvas = document.getElementById('game');
+const gc = gameCanvas.getContext('2d');
+let W, H;
+function resize(){
+  W = gameCanvas.width = window.innerWidth;
+  H = gameCanvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── CONSTANTS ──
+const RANK_COLORS = ['','#FFE600','#C8C8C8','#CD7F32','#00E5FF','#FF6BF5'];
+const PLAYER_COLORS = ['#39FF14','#9B59FF','#00E5FF','#FF6BF5','#FF8C00','#FF3B3B'];
+const PLAYER_NAMES = ['PLAYER 1','PLAYER 2','PLAYER 3','PLAYER 4','PLAYER 5','PLAYER 6'];
+
+let running = false, objects = [];
+let gameStartTime = 0, timerInterval = null;
+const players = {};
+let seenThisFrame = new Set();
+
+// ── SETTINGS READER ──
+function S(){
+  return {
+    probs: [1,2,3,4,5].map(i => parseFloat(document.getElementById('p'+i).value)||0),
+    prizes: [1,2,3,4,5].map(i => document.getElementById('pr'+i).value),
+    count: parseInt(document.getElementById('objCount').value)||20,
+    iconSize: parseInt(document.getElementById('iconSize').value)||60,
+    cooldown: parseInt(document.getElementById('cooldown').value)||8,
+    speed: parseFloat(document.getElementById('speedMult').value)||1.0,
+    sway: parseFloat(document.getElementById('swayAmount').value)||0.8,
+    winSize: parseInt(document.getElementById('winSize').value)||120,
+    lx1: parseFloat(document.getElementById('lidarX1').value)||-3,
+    lx2: parseFloat(document.getElementById('lidarX2').value)||3,
+    ly1: parseFloat(document.getElementById('lidarY1').value)||0.5,
+    ly2: parseFloat(document.getElementById('lidarY2').value)||5,
+  };
+}
+
+// ── BG & BAG CONTROLS ──
+function changeBG(){
+  const val = document.getElementById('bgSelect').value;
+  const el = document.getElementById('bgLayer');
+  if(val) el.style.backgroundImage = `url('${val}')`;
+  else el.style.backgroundImage = 'none';
+}
+
+function updateOverlay(){
+  const alpha = parseInt(document.getElementById('overlayAlpha').value)||35;
+  document.getElementById('bgOverlay').style.background = `rgba(10,8,28,${alpha/100})`;
+}
+
+function updateCursorSize(){
+  const size = parseInt(document.getElementById('cursorSize').value) || 120;
+  document.documentElement.style.setProperty('--cursor-size', size + 'px');
+}
+
+function updateMask(){
+  const visible = document.getElementById('maskVisible').value === '1';
+  const height = parseInt(document.getElementById('maskHeight').value)||12;
+  const mask = document.getElementById('bagMask');
+  mask.style.display = visible ? 'block' : 'none';
+  mask.style.height = height + 'vh';
+}
+
+// ── ATTRACT SCREEN ──
+function renderAttractIcons(){
+  const container = document.getElementById('attractIcons');
+  const showIdxs = [0,3,6,9,12,15]; // representative icons
+  container.innerHTML = showIdxs.map(i =>
+    `<img src="${OBJ_IMAGES[i]}">`
+  ).join('');
+}
+
+function renderPrizeChips(){
+  const s = S();
+  document.getElementById('prizeChips').innerHTML = s.prizes.map((p,i) =>
+    `<div class="prize-chip" style="border-color:${RANK_COLORS[i+1]}40;color:${RANK_COLORS[i+1]}">
+      <img src="${RANK_IMAGES[i+1]}">${p}</div>`
+  ).join('');
+}
+
+// ── OBJECT CLASS (인터빌드 스타일 모션) ──
+class Obj{
+  constructor(){ this.spawn(true); }
+
+  spawn(initial){
+    const s = S();
+    // 화면 전체에 균등 분포
+    this.x = 60 + Math.random() * (W - 120);
+    if(initial){
+      this.y = Math.random() * H;
+    } else {
+      this.y = -40 - Math.random() * 200;
+    }
+
+    this.size = s.iconSize; // UNIFORM SIZE
+    this.srcIdx = Math.floor(Math.random() * OBJ_IMAGES.length);
+
+    const spd = s.speed;
+    this.vy = (2.0 + Math.random() * 2.0) * spd;
+
+    // Phase for sway & pulse
+    this.phase = Math.random() * Math.PI * 2;
+    this.rot = 0;
+    this.rotV = (Math.random() - 0.5) * 0.015;
+    this.pulse = Math.random() * Math.PI * 2;
+    this.glowH = Math.random() * 360;
+  }
+
+  update(){
+    const s = S();
+    const spd = s.speed;
+
+    // 좌우 흔들림 (부드러운 사인파 — 직접 x에 적용, vx 떨림 방지)
+    this.phase += 0.01;
+    const swayOffset = Math.sin(this.phase) * s.sway * 0.4;
+
+    // 중력 낙하 (일정 속도, 가속 없음 — 안정적)
+    this.x += swayOffset;
+    this.y += this.vy;
+
+    // 좌우 경계
+    if(this.x < 30) this.x = 30;
+    if(this.x > W - 30) this.x = W - 30;
+
+    this.rot += this.rotV;
+    this.pulse += 0.025;
+
+    // 바닥 도달 시 리스폰
+    if(this.y > H + 80) this.spawn(false);
+  }
+
+  draw(){
+    const img = loadedImgs['obj_'+this.srcIdx];
+    if(!img || !img.complete) return;
+
+    if(this.y < -40) return;
+
+    const sz = this.size;
+    gc.save();
+    gc.translate(this.x, this.y);
+    gc.rotate(this.rot);
+    gc.globalAlpha = 1.0;
+    gc.drawImage(img, -sz/2, -sz/2, sz, sz);
+    gc.restore();
+  }
+
+  hit(mx, my){
+    return Math.hypot(this.x - mx, this.y - my) < this.size/2 + 22;
+  }
+}
+
+// 반발력 제거 — 겹침은 허용 (떨림 방지)
+
+function initObjects(){
+  const s = S();
+  objects = [];
+  for(let i=0; i<s.count; i++){
+    const o = new Obj();
+    objects.push(o);
+  }
+}
+
+// ── PLAYER MANAGEMENT ──
+function getOrCreatePlayer(id){
+  if(!players[id]){
+    const existingCount = Object.keys(players).length;
+    const idx = existingCount % 6;
+    const col = PLAYER_COLORS[idx];
+    const el = document.createElement('div');
+    el.className = 'player-cursor';
+    el.innerHTML = `<div class="cursor-label" style="--col:${col}">${PLAYER_NAMES[idx]}</div>
+      <div class="cursor-ring" id="ring_${id.replace(/[^a-z0-9]/gi,'_')}" style="--col:${col}">
+        <div class="cursor-dot" style="--col:${col}"></div></div>`;
+    document.body.appendChild(el);
+    players[id] = {id, x:W/2, y:H/2, col, el, idx, lastWinTime:0};
+    players[id].ring = el.querySelector('[id^="ring_"]');
+  }
+  return players[id];
+}
+
+function removePlayer(id){
+  if(players[id]){
+    players[id].el.remove();
+    delete players[id];
+  }
+}
+
+function updatePlayerPos(id, x, y){
+  const p = getOrCreatePlayer(id);
+  p.x = x; p.y = y;
+  p.el.style.left = x + 'px';
+  p.el.style.top = y + 'px';
+  checkHits(p);
+}
+
+// ── LIDAR COORDINATE MAPPING ──
+function lidarToScreen(lx, ly){
+  const s = S();
+  const px = ((lx - s.lx1) / (s.lx2 - s.lx1)) * W;
+  const py = ((ly - s.ly1) / (s.ly2 - s.ly1)) * H;
+  return { x: Math.max(0,Math.min(W,px)), y: Math.max(0,Math.min(H,py)) };
+}
+
+// ── WEBSOCKET ──
+let ws = null;
+let demoMode = false;
+
+function connectWS(){
+  const port = document.getElementById('wsPort').value || 8765;
+  const url = `ws://localhost:${port}`;
+  setStatus('disconnected','● 연결 시도중...');
+  try{
+    ws = new WebSocket(url);
+    ws.onopen = () => {
+      setStatus('connected','● LIDAR 연결됨');
+      demoMode = false;
+    };
+    ws.onmessage = (e) => {
+      try{
+        const data = JSON.parse(e.data);
+        if(data.players){
+          seenThisFrame = new Set();
+          data.players.forEach(p => {
+            const screen = lidarToScreen(p.x, p.y);
+            updatePlayerPos(p.id, screen.x, screen.y);
+            seenThisFrame.add(p.id);
+          });
+          Object.keys(players).forEach(id => {
+            if(id.startsWith('lidar_') && !seenThisFrame.has(id)){
+              removePlayer(id);
+            }
+          });
+        }
+      } catch(err){ console.warn('WS parse error', err); }
+    };
+    ws.onerror = () => setStatus('disconnected','● 연결 실패');
+    ws.onclose = () => {
+      setStatus('disconnected','● 연결 끊김');
+      setTimeout(() => { if(!demoMode) connectWS(); }, 3000);
+    };
+  } catch(e){
+    setStatus('disconnected','● WebSocket 불가');
+  }
+}
+
+function reconnectWS(){ if(ws) ws.close(); demoMode=false; connectWS(); }
+
+function startDemoMode(){
+  demoMode = true;
+  if(ws) ws.close();
+  setStatus('demo','● 데모모드 (마우스)');
+  // Auto-start game if not running
+  if(!running){
+    running = true;
+    initObjects();
+    document.getElementById('attractScreen').classList.add('hidden');
+    startTimer();
+  }
+  toggleAdmin();
+}
+
+function setStatus(cls, msg){
+  const el = document.getElementById('wsStatus');
+  el.className = cls;
+  el.textContent = msg;
+}
+
+// Demo: mouse
+window.addEventListener('mousemove', e => {
+  if(demoMode) updatePlayerPos('mouse', e.clientX, e.clientY);
+});
+
+// Multi-touch demo
+window.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if(demoMode){
+    Array.from(e.touches).forEach(t =>
+      updatePlayerPos('touch_'+t.identifier, t.clientX, t.clientY)
+    );
+  }
+}, {passive:false});
+
+window.addEventListener('touchend', e => {
+  if(demoMode){
+    Array.from(e.changedTouches).forEach(t => {
+      removePlayer('touch_'+t.identifier);
+    });
+  }
+});
+
+// ── HIT DETECTION & WIN ──
+function checkHits(player){
+  if(!running) return;
+  objects.forEach(o => {
+    if(o.hit(player.x, player.y)){
+      if(player.ring){
+        player.ring.classList.add('catching');
+        setTimeout(() => player.ring && player.ring.classList.remove('catching'), 160);
+      }
+      spawnParticles(o.x, o.y, player.col);
+      o.spawn(false);
+
+      const now = Date.now(), s = S();
+      if(now - (player.lastWinTime||0) > s.cooldown * 1000){
+        const rank = rollWin();
+        if(rank > 0){
+          player.lastWinTime = now;
+          triggerWin(player, rank);
+        }
+      }
+    }
+  });
+}
+
+function rollWin(){
+  const s = S();
+  let r = Math.random() * 100;
+  for(let i=0; i<5; i++){
+    if(r < s.probs[i]) return i+1;
+    r -= s.probs[i];
+  }
+  return 0;
+}
+
+function triggerWin(player, rank){
+  const s = S();
+  showBanner(player, rank, s.prizes[rank-1]);
+  showWinSplash(player, rank, s.prizes[rank-1]);
+  spawnExplosion(player.x, player.y, RANK_COLORS[rank], rank);
+}
+
+let _bannerTimer = null;
+function showBanner(player, rank, prizeName){
+  const col = RANK_COLORS[rank];
+  const zone = document.getElementById('bannerZone');
+  // 항상 1줄만 — 기존 배너 모두 제거
+  zone.innerHTML = '';
+  if(_bannerTimer) clearTimeout(_bannerTimer);
+  const b = document.createElement('div');
+  b.className = 'win-banner';
+  b.style.cssText = `color:${col};background:rgba(10,8,28,.88);border-bottom-color:${col}50;`;
+  b.innerHTML = `<span style="color:${col};font-size:clamp(13px,1.6vw,22px);letter-spacing:.12em;">${rank}등 당첨! — ${prizeName}</span>`;
+  zone.appendChild(b);
+  requestAnimationFrame(() => requestAnimationFrame(() => b.classList.add('show')));
+  _bannerTimer = setTimeout(() => { b.classList.remove('show'); setTimeout(() => b.remove(), 400); }, 4000);
+}
+
+function getRandomRankObj(rank){
+  const group = RANK_OBJ_GROUPS[rank];
+  if(!group || group.length===0) return null;
+  const idx = group[Math.floor(Math.random()*group.length)];
+  return idx + '.png';
+}
+
+function showWinSplash(player, rank, prizeName){
+  const overlay = document.getElementById('winOverlay');
+  // 스플래시 최대 3개 제한 — 초과 시 가장 오래된 것 즉시 제거
+  const MAX_SPLASHES = 3;
+  while(overlay.children.length >= MAX_SPLASHES){
+    overlay.removeChild(overlay.firstChild);
+  }
+  const sp = document.createElement('div');
+  sp.className = 'win-splash';
+  const px = Math.min(Math.max(player.x, 150), W-150);
+  const py = Math.min(Math.max(player.y - 150, 100), H-220);
+  sp.style.cssText = `left:${px}px;top:${py}px;`;
+  const ws2 = S().winSize * 2;
+  sp.innerHTML = `<img class="rank-big" style="width:${ws2}px!important" src="${RANK_IMAGES[rank]}">`;
+  overlay.appendChild(sp);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    sp.style.opacity = '1';
+    sp.style.animation = 'rankSpin .5s cubic-bezier(.175,.885,.32,1.275) forwards';
+  }));
+  setTimeout(() => {
+    sp.style.transition = 'opacity .4s';
+    sp.style.opacity = '0';
+    setTimeout(() => sp.remove(), 450);
+  }, 3000);
+}
+
+function spawnExplosion(x, y, col, rank){
+  const layer = document.getElementById('explosionLayer');
+  const count = rank===1 ? 60 : rank<=3 ? 40 : 24;
+  for(let i=0; i<count; i++){
+    const el = document.createElement('div');
+    const angle = (i/count)*Math.PI*2 + Math.random()*.3;
+    const dist = 70 + Math.random() * (rank===1 ? 240 : 150);
+    const size = 4 + Math.random()*8;
+    const dur = .45 + Math.random()*.5;
+    el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${size}px;height:${size}px;border-radius:50%;background:${col};box-shadow:0 0 8px ${col};pointer-events:none;transition:transform ${dur}s ease-out,opacity ${dur}s ease-out;opacity:1;`;
+    layer.appendChild(el);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.style.transform = `translate(${Math.cos(angle)*dist}px,${Math.sin(angle)*dist}px) scale(0)`;
+      el.style.opacity = '0';
+    }));
+    setTimeout(() => el.remove(), (dur+.1)*1000);
+  }
+  // 1등: full-screen flash
+  if(rank===1){
+    const flash = document.createElement('div');
+    flash.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at ${x/W*100}% ${y/H*100}%,rgba(255,230,0,.4) 0%,transparent 60%);pointer-events:none;z-index:49;transition:opacity .9s;`;
+    layer.appendChild(flash);
+    requestAnimationFrame(() => requestAnimationFrame(() => flash.style.opacity='0'));
+    setTimeout(() => flash.remove(), 1000);
+  }
+}
+
+function spawnParticles(x, y, col){
+  const layer = document.getElementById('explosionLayer');
+  for(let i=0; i<10; i++){
+    const el = document.createElement('div');
+    const angle = Math.random()*Math.PI*2;
+    const dist = 30 + Math.random()*55;
+    const size = 3 + Math.random()*5;
+    const dur = .3 + Math.random()*.3;
+    el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${size}px;height:${size}px;border-radius:50%;background:${col};pointer-events:none;transition:transform ${dur}s ease-out,opacity ${dur}s ease-out;opacity:1;`;
+    layer.appendChild(el);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.style.transform = `translate(${Math.cos(angle)*dist}px,${Math.sin(angle)*dist}px) scale(0)`;
+      el.style.opacity = '0';
+    }));
+    setTimeout(() => el.remove(), (dur+.05)*1000);
+  }
+}
+
+// ── GAME LOOP ──
+function loop(){
+  gc.clearRect(0, 0, W, H);
+  if(running){
+    objects.forEach(o => { o.update(); o.draw(); });
+  }
+  requestAnimationFrame(loop);
+}
+
+// ── TIMER ──
+function startTimer(){
+  const mode = document.getElementById('gameMode').value;
+  const timerEl = document.getElementById('timerDisplay');
+  if(timerInterval) clearInterval(timerInterval);
+
+  if(mode === 'infinite'){
+    timerEl.style.display = 'none';
+    return;
+  }
+
+  const limitMin = parseInt(document.getElementById('timeLimit').value) || 5;
+  const limit = limitMin * 60;
+  gameStartTime = Date.now();
+  timerEl.style.display = 'block';
+
+  timerInterval = setInterval(() => {
+    const elapsed = (Date.now() - gameStartTime) / 1000;
+    const remain = Math.max(0, limit - elapsed);
+    const min = Math.floor(remain / 60);
+    const sec = Math.floor(remain % 60);
+    timerEl.textContent = `${min}:${sec.toString().padStart(2,'0')}`;
+
+    // 10초 이하 경고
+    if(remain <= 10) timerEl.classList.add('warning');
+    else timerEl.classList.remove('warning');
+
+    // 시간 종료
+    if(remain <= 0){
+      clearInterval(timerInterval);
+      timerInterval = null;
+      endGame();
+    }
+  }, 200);
+}
+
+function endGame(){
+  running = false;
+  document.getElementById('timerDisplay').style.display = 'none';
+  document.getElementById('timerDisplay').classList.remove('warning');
+  document.getElementById('attractScreen').classList.remove('hidden');
+}
+
+// ── START ──
+document.getElementById('startBtn').addEventListener('click', () => {
+  running = true;
+  renderPrizeChips();
+  initObjects();
+  document.getElementById('attractScreen').classList.add('hidden');
+  startTimer();
+});
+
+// ── ADMIN ──
+function toggleAdmin(){
+  document.getElementById('adminPanel').classList.toggle('open');
+}
+
+function testWin(rank){
+  const testPlayer = {x:W/2, y:H/2, col:'#FFE600', idx:0};
+  triggerWin(testPlayer, rank);
+}
+
+// Keyboard shortcut: Ctrl+Shift+A to toggle admin
+document.addEventListener('keydown', e => {
+  if(e.ctrlKey && e.shiftKey && e.key === 'A'){
+    e.preventDefault();
+    toggleAdmin();
+  }
+  // ESC to close admin
+  if(e.key === 'Escape'){
+    document.getElementById('adminPanel').classList.remove('open');
+  }
+});
+
+// ── SETTINGS SAVE/LOAD (localStorage) ──
+function saveSettings(){
+  const settings = {
+    bg: document.getElementById('bgSelect').value,
+    overlayAlpha: document.getElementById('overlayAlpha').value,
+    maskHeight: document.getElementById('maskHeight').value,
+    maskVisible: document.getElementById('maskVisible').value,
+    gameMode: document.getElementById('gameMode').value,
+    timeLimit: document.getElementById('timeLimit').value,
+    p1: document.getElementById('p1').value,
+    p2: document.getElementById('p2').value,
+    p3: document.getElementById('p3').value,
+    p4: document.getElementById('p4').value,
+    p5: document.getElementById('p5').value,
+    pr1: document.getElementById('pr1').value,
+    pr2: document.getElementById('pr2').value,
+    pr3: document.getElementById('pr3').value,
+    pr4: document.getElementById('pr4').value,
+    pr5: document.getElementById('pr5').value,
+    objCount: document.getElementById('objCount').value,
+    iconSize: document.getElementById('iconSize').value,
+    speedMult: document.getElementById('speedMult').value,
+    swayAmount: document.getElementById('swayAmount').value,
+    winSize: document.getElementById('winSize').value,
+    cursorSize: document.getElementById('cursorSize').value,
+    cooldown: document.getElementById('cooldown').value,
+    wsPort: document.getElementById('wsPort').value,
+    lidarX1: document.getElementById('lidarX1').value,
+    lidarX2: document.getElementById('lidarX2').value,
+    lidarY1: document.getElementById('lidarY1').value,
+    lidarY2: document.getElementById('lidarY2').value,
+  };
+  localStorage.setItem('ultra_catch_settings', JSON.stringify(settings));
+  alert('설정이 저장되었습니다!');
+}
+
+function loadSettings(){
+  const raw = localStorage.getItem('ultra_catch_settings');
+  if(!raw){ alert('저장된 설정이 없습니다.'); return; }
+  const s = JSON.parse(raw);
+  Object.keys(s).forEach(k => {
+    const el = document.getElementById(k === 'bg' ? 'bgSelect' : k);
+    if(el) el.value = s[k];
+  });
+  changeBG();
+  updateOverlay();
+  updateMask();
+  renderPrizeChips();
+  if(running) initObjects();
+  alert('설정을 불러왔습니다!');
+}
+
+// ── AUTO-LOAD saved settings on boot ──
+function autoLoadSettings(){
+  const raw = localStorage.getItem('ultra_catch_settings');
+  if(!raw) return;
+  try{
+    const s = JSON.parse(raw);
+    Object.keys(s).forEach(k => {
+      const el = document.getElementById(k === 'bg' ? 'bgSelect' : k);
+      if(el) el.value = s[k];
+    });
+    changeBG();
+    updateOverlay();
+    updateMask();
+  } catch(e){}
+}
+
+
+// ── BOOT ──
+preloadAll(() => {
+  console.log('All images loaded');
+  renderAttractIcons();
+  renderPrizeChips();
+});
+
+autoLoadSettings();
+changeBG();
+updateCursorSize();
+loop();
+connectWS();
+
+</script>
+</body>
+</html>
