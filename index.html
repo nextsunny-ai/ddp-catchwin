@@ -344,7 +344,7 @@ function updateMask(){
 // ── ATTRACT SCREEN ──
 function renderAttractIcons(){
   const container = document.getElementById('attractIcons');
-  const showIdxs = [0,3,6,9,12,15]; // representative icons
+  const showIdxs = [0,3,6,10,12,15]; // representative icons
   container.innerHTML = showIdxs.map(i =>
     `<img src="${OBJ_IMAGES[i]}">`
   ).join('');
