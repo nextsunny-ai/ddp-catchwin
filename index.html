@@ -14,7 +14,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Noto Sans KR',sans
 #bgOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(10,8,28,0);z-index:1;}
 canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointer-events:none;}
 
-/* BAG MASK: 배경과 완전히 동일한 사이즈/위치로 덮어서 쇼핑백 마스크 */
+/* BAG MASK */
 #bagMask{position:fixed;top:0;left:0;width:100%;height:100%;z-index:25;pointer-events:none;
   background-image:url('보라색쇼핑백_mask.png');
   background-size:cover;
@@ -85,7 +85,7 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
 
 /* ADMIN */
 #adminToggle{position:fixed;bottom:20px;left:20px;background:rgba(255,230,0,.08);border:1px solid rgba(255,230,0,.2);color:rgba(255,230,0,.35);font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:.2em;padding:7px 13px;cursor:pointer;z-index:200;}
-#adminPanel{position:fixed;bottom:58px;left:20px;width:340px;background:rgba(10,8,28,.97);border:1px solid rgba(242,237,228,.1);z-index:200;padding:18px;display:none;max-height:80vh;overflow-y:auto;}
+#adminPanel{position:fixed;top:20px;bottom:80px;left:20px;width:340px;background:rgba(10,8,28,.97);border:1px solid rgba(242,237,228,.1);z-index:200;padding:18px;display:none;overflow:hidden auto;-webkit-overflow-scrolling:touch;pointer-events:auto;}
 #adminPanel.open{display:block;}
 .ap-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.3em;color:var(--yellow);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(242,237,228,.1);}
 .ap-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
@@ -111,7 +111,7 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
 <!-- <div class="scanlines"></div> -->
 
 <!-- BAG MASK: 보라색 쇼핑백 연장 (배경 쇼핑백과 이어짐) -->
-<div id="bagMask" style="display:none;"></div>
+<div id="bagMask"></div>
 
 <!-- EFFECTS -->
 <div id="explosionLayer"></div>
@@ -150,32 +150,27 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
   <div class="ap-row"><label>배경</label>
     <select id="bgSelect" onchange="changeBG()">
       <option value="">없음 (검정)</option>
-      <option value="NBG01.png" selected>NBG01</option>
-      <option value="NBG02.png">NBG02</option>
-      <option value="NBG03.png">NBG03</option>
-      <option value="NBG04.png">NBG04</option>
-      <option value="NBG05.png">NBG05</option>
-      <option value="NBG06.png">NBG06</option>
-      <option value="NBG07.png">NBG07</option>
+      <option value="skybg.jpg" selected>SKY (하늘)</option>
     </select>
   </div>
-  <div class="ap-row"><label>오버레이 투명도</label><input type="number" id="overlayAlpha" value="35" min="0" max="100" step="5" onchange="updateOverlay()"></div>
+  <div class="ap-row"><label>오버레이 투명도</label><input type="number" id="overlayAlpha" value="0" min="0" max="100" step="5" onchange="updateOverlay()"></div>
 
   <div class="ap-sec">상단 마스크 (오브젝트 페이드인)</div>
   <div class="ap-row"><label>마스크 높이(vh)</label><input type="number" id="maskHeight" value="12" min="0" max="40" step="1" onchange="updateMask()"></div>
   <div class="ap-row"><label>마스크 표시</label>
     <select id="maskVisible" onchange="updateMask()">
       <option value="1">표시</option>
-      <option value="0">숨김</option>
+      <option value="0" selected>숨김</option>
     </select>
   </div>
 
   <div class="ap-sec">당첨 확률 (%)</div>
   <div class="ap-row"><label>1등</label><input type="number" id="p1" value="0.3" min="0" max="100" step="0.1"></div>
   <div class="ap-row"><label>2등</label><input type="number" id="p2" value="0.7" min="0" max="100" step="0.1"></div>
-  <div class="ap-row"><label>3등</label><input type="number" id="p3" value="4" min="0" max="100" step="0.1"></div>
-  <div class="ap-row"><label>4등</label><input type="number" id="p4" value="15" min="0" max="100" step="0.1"></div>
-  <div class="ap-row"><label>5등</label><input type="number" id="p5" value="80" min="0" max="100" step="0.1"></div>
+  <div class="ap-row"><label>3등</label><input type="number" id="p3" value="2" min="0" max="100" step="0.1"></div>
+  <div class="ap-row"><label>4등</label><input type="number" id="p4" value="3" min="0" max="100" step="0.1"></div>
+  <div class="ap-row"><label>5등</label><input type="number" id="p5" value="4" min="0" max="100" step="0.1"></div>
+  <div class="ap-row"><label>꽝</label><input type="number" id="p0" value="80" min="0" max="100" step="0.1"></div>
 
   <div class="ap-sec">경품명</div>
   <div class="ap-row"><label>1등</label><input type="text" id="pr1" value="1등"></div>
@@ -194,13 +189,14 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
   <div class="ap-row"><label>제한 시간(분)</label><input type="number" id="timeLimit" value="5" min="1" max="30" step="1"></div>
 
   <div class="ap-sec">게임 설정</div>
-  <div class="ap-row"><label>오브젝트 수</label><input type="number" id="objCount" value="20" min="6" max="50"></div>
-  <div class="ap-row"><label>아이콘 크기(px)</label><input type="number" id="iconSize" value="120" min="20" max="300"></div>
-  <div class="ap-row"><label>낙하 속도 (0.5~5)</label><input type="number" id="speedMult" value="2.0" min="0.3" max="5" step="0.1"></div>
-  <div class="ap-row"><label>좌우 흔들림</label><input type="number" id="swayAmount" value="0.8" min="0" max="3" step="0.1"></div>
-  <div class="ap-row"><label>당첨이미지 크기(px)</label><input type="number" id="winSize" value="120" min="30" max="300"></div>
-  <div class="ap-row"><label>커서 크기(px)</label><input type="number" id="cursorSize" value="50" min="20" max="300" step="10" onchange="updateCursorSize()"></div>
+  <div class="ap-row"><label>오브젝트 수</label><input type="number" id="objCount" value="5" min="1" max="50"></div>
+  <div class="ap-row"><label>아이콘 크기(px)</label><input type="number" id="iconSize" value="90" min="20" max="300"></div>
+  <div class="ap-row"><label>낙하 속도 (0.5~5)</label><input type="number" id="speedMult" value="1.2" min="0.3" max="5" step="0.1"></div>
+  <div class="ap-row"><label>좌우 흔들림</label><input type="number" id="swayAmount" value="2" min="0" max="30" step="1"></div>
+  <div class="ap-row"><label>당첨이미지 크기(px)</label><input type="number" id="winSize" value="90" min="30" max="300"></div>
+  <div class="ap-row"><label>커서 크기(px)</label><input type="number" id="cursorSize" value="40" min="20" max="300" step="10" onchange="updateCursorSize()"></div>
   <div class="ap-row"><label>당첨 쿨타임(초)</label><input type="number" id="cooldown" value="1" min="0" max="60"></div>
+  <div class="ap-row"><label>당첨 표시시간(초)</label><input type="number" id="winDuration" value="2.5" min="0.5" max="10" step="0.5"></div>
 
   <div class="ap-sec">라이다 캘리브레이션</div>
   <div class="ap-row"><label>감지영역 X시작(m)</label><input type="number" id="lidarX1" value="-3.0" step="0.5"></div>
@@ -233,21 +229,25 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
 const OBJ_IMAGES = [];
 for(let i=1; i<=19; i++) OBJ_IMAGES.push(i+'.png');
 
-const RANK_IMAGES = [null, '1등.png', '2등.png', '3등.png', '4등.png', '5등.png'];
+const RANK_IMAGES = ['꽝.png', '1등.png', '2등.png', '3등.png', '4등.png', '5등.png'];
 
-// 등수별 아이콘 그룹 (당첨 시 이 중 랜덤 표시)
+// 등수별 아이콘 그룹 — 아이콘 번호(1~19)에서 배열 인덱스(0~18)로 변환
 const RANK_OBJ_GROUPS = {
-  1: [7, 6, 3, 11],    // 1등: 캐릭터 4종
-  2: [14, 15, 12, 19],  // 2등: 코인+선물상자
-  3: [16, 15, 6, 11],   // 3등: 선물상자+코인+캐릭터
-  4: [12, 14, 9, 4, 17, 18], // 4등
-  5: [12, 14, 9, 4, 17, 18], // 5등
+  1: [18, 14],              // 1등: 19, 15
+  2: [17, 13],              // 2등: 18, 14
+  3: [16, 11],              // 3등: 17, 12
+  4: [3, 10, 6, 5, 2],      // 4등: 4, 11, 7, 6, 3
+  5: [8, 6, 4, 0, 10],      // 5등: 9, 7, 5, 1, 11
+  0: [7, 5, 0, 10, 18, 12, 14], // 꽝: 8, 6, 1, 11, 19, 13, 15
 };
+
+// 사용할 아이콘만 (등수에 배치된 것만)
+const ALLOWED_ICONS = [...new Set(Object.values(RANK_OBJ_GROUPS).flat())];
 
 // Preload all images
 const loadedImgs = {};
 let imagesLoaded = 0;
-const totalImages = OBJ_IMAGES.length + 5; // 19 objects + 5 ranks
+const totalImages = OBJ_IMAGES.length + 6; // 19 objects + 5 ranks + 꽝
 
 function preloadAll(callback){
   function onLoad(){ imagesLoaded++; if(imagesLoaded>=totalImages && callback) callback(); }
@@ -258,7 +258,7 @@ function preloadAll(callback){
     img.src = src;
     loadedImgs['obj_'+i] = img;
   });
-  for(let r=1; r<=5; r++){
+  for(let r=0; r<=5; r++){
     const img = new Image();
     img.onload = onLoad;
     img.onerror = onLoad;
@@ -373,7 +373,7 @@ class Obj{
     }
 
     this.size = s.iconSize; // UNIFORM SIZE
-    this.srcIdx = Math.floor(Math.random() * OBJ_IMAGES.length);
+    this.srcIdx = ALLOWED_ICONS[Math.floor(Math.random() * ALLOWED_ICONS.length)];
 
     const spd = s.speed;
     this.vy = (2.0 + Math.random() * 2.0) * spd;
@@ -546,6 +546,8 @@ window.addEventListener('mousemove', e => {
 
 // Multi-touch demo
 window.addEventListener('touchmove', e => {
+  // 어드민 패널 안에서는 스크롤 허용
+  if(e.target.closest('#adminPanel')) return;
   e.preventDefault();
   if(demoMode){
     Array.from(e.touches).forEach(t =>
@@ -580,6 +582,11 @@ function checkHits(player){
         if(rank > 0){
           player.lastWinTime = now;
           triggerWin(player, rank);
+        } else if(rank === 0){
+          // 꽝: 터지는 효과 + 꽝 이미지
+          player.lastWinTime = now;
+          spawnExplosion(o.x, o.y, '#888888', 0);
+          showWinSplash(player, 0, '꽝');
         }
       }
     }
@@ -588,12 +595,17 @@ function checkHits(player){
 
 function rollWin(){
   const s = S();
+  const kwang = parseFloat(document.getElementById('p0').value)||0;
   let r = Math.random() * 100;
+  // 먼저 1~5등 체크
   for(let i=0; i<5; i++){
     if(r < s.probs[i]) return i+1;
     r -= s.probs[i];
   }
-  return 0;
+  // 꽝 체크
+  if(r < kwang) return 0;
+  // 나머지: 아무 일도 안 일어남
+  return -1;
 }
 
 function triggerWin(player, rank){
@@ -645,11 +657,13 @@ function showWinSplash(player, rank, prizeName){
     sp.style.opacity = '1';
     sp.style.animation = 'rankSpin .5s cubic-bezier(.175,.885,.32,1.275) forwards';
   }));
+  const winDur = parseFloat(document.getElementById('winDuration').value) || 2.5;
+  const duration = rank === 0 ? 1000 : winDur * 1000; // 꽝 1초, 당첨은 어드민 설정
   setTimeout(() => {
     sp.style.transition = 'opacity .4s';
     sp.style.opacity = '0';
     setTimeout(() => sp.remove(), 450);
-  }, 3000);
+  }, duration);
 }
 
 function spawnExplosion(x, y, col, rank){
@@ -760,7 +774,12 @@ document.getElementById('startBtn').addEventListener('click', () => {
 
 // ── ADMIN ──
 function toggleAdmin(){
-  document.getElementById('adminPanel').classList.toggle('open');
+  const panel = document.getElementById('adminPanel');
+  panel.classList.toggle('open');
+  // 어드민 패널에서 마우스 휠 스크롤 보장
+  if(panel.classList.contains('open')){
+    panel.addEventListener('wheel', e => e.stopPropagation(), {passive:true});
+  }
 }
 
 function testWin(rank){
