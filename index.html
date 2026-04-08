@@ -156,8 +156,7 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
   </div>
   <div class="ap-row"><label>오버레이 투명도</label><input type="number" id="overlayAlpha" value="0" min="0" max="100" step="5" onchange="updateOverlay()"></div>
 
-  <div class="ap-sec">상단 마스크 (오브젝트 페이드인)</div>
-  <div class="ap-row"><label>마스크 높이(vh)</label><input type="number" id="maskHeight" value="12" min="0" max="40" step="1" onchange="updateMask()"></div>
+  <div class="ap-sec">쇼핑백 마스크</div>
   <div class="ap-row"><label>마스크 표시</label>
     <select id="maskVisible" onchange="updateMask()">
       <option value="1">표시</option>
@@ -336,10 +335,9 @@ function updateCursorSize(){
 
 function updateMask(){
   const visible = document.getElementById('maskVisible').value === '1';
-  const height = parseInt(document.getElementById('maskHeight').value)||12;
   const mask = document.getElementById('bagMask');
   mask.style.display = visible ? 'block' : 'none';
-  mask.style.height = height + 'vh';
+  mask.style.height = '100%';
 }
 
 // ── ATTRACT SCREEN ──
