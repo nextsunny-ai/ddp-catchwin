@@ -363,8 +363,12 @@ class Obj{
 
   spawn(initial){
     const s = S();
-    // 화면 전체에 균등 분포
-    this.x = 60 + Math.random() * (W - 120);
+    // 화면을 오브젝트 수만큼 구역으로 나눠 균등 분배
+    const count = s.count || 5;
+    const idx = objects ? objects.indexOf(this) : 0;
+    const zone = idx >= 0 ? idx : Math.floor(Math.random() * count);
+    const zoneW = (W - 120) / count;
+    this.x = 60 + zoneW * zone + Math.random() * zoneW;
     if(initial){
       this.y = Math.random() * H;
     } else {
