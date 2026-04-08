@@ -114,6 +114,9 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
 <!-- BAG MASK: 보라색 쇼핑백 연장 (배경 쇼핑백과 이어짐) -->
 <div id="bagMask"></div>
 
+<!-- WEBCAM -->
+<video id="webcamVideo" style="display:none;" playsinline></video>
+
 <!-- EFFECTS -->
 <div id="explosionLayer"></div>
 <div id="winOverlay"></div>
@@ -144,8 +147,31 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
 
   <div class="ap-sec">WebSocket 연결</div>
   <div class="ap-row"><label>서버 포트</label><input type="number" id="wsPort" value="8765" min="1000" max="9999"></div>
-  <button class="ap-btn" onclick="reconnectWS()">재연결</button>
+  <button class="ap-btn" onclick="reconnectWS()">재연결 (라이다)</button>
   <button class="ap-btn" onclick="startDemoMode()">데모모드 (마우스)</button>
+  <button class="ap-btn" style="background:rgba(155,89,255,.15);border-color:rgba(155,89,255,.4);color:#9B59FF;" onclick="startWebcamMode()">웹캠 모드</button>
+  <div class="ap-row" style="margin-top:4px;">
+    <label>웹캠 미리보기</label>
+    <select id="webcamPreview" onchange="toggleWebcamPreview()">
+      <option value="1" selected>표시</option>
+      <option value="0">숨김</option>
+    </select>
+  </div>
+  <div class="ap-row" id="webcamModeRow" style="display:none;margin-top:4px;">
+    <label>카메라 수</label>
+    <select id="webcamCount" style="background:#1a1830;color:#F2EDE4;border:1px solid rgba(242,237,228,.15);">
+      <option value="1">1대</option>
+      <option value="2">2대 (좌/우)</option>
+    </select>
+  </div>
+  <div class="ap-row" id="webcamSelectRow" style="display:none;margin-top:6px;">
+    <label>카메라 A (왼쪽)</label>
+    <select id="webcamSelect" style="width:140px;background:#1a1830;color:#F2EDE4;border:1px solid rgba(242,237,228,.15);" onchange="switchWebcam()"></select>
+  </div>
+  <div class="ap-row" id="webcamSelectRow2" style="display:none;margin-top:4px;">
+    <label>카메라 B (오른쪽)</label>
+    <select id="webcamSelect2" style="width:140px;background:#1a1830;color:#F2EDE4;border:1px solid rgba(242,237,228,.15);" onchange="switchWebcam2()"></select>
+  </div>
 
   <div class="ap-sec">배경 선택</div>
   <div class="ap-row"><label>배경</label>
@@ -488,6 +514,8 @@ function lidarToScreen(lx, ly){
 // ── WEBSOCKET ──
 let ws = null;
 let demoMode = false;
+let webcamMode = false;
+let webcamPlayers = {};
 
 function connectWS(){
   const port = document.getElementById('wsPort').value || 8765;
@@ -527,7 +555,18 @@ function connectWS(){
   }
 }
 
-function reconnectWS(){ if(ws) ws.close(); demoMode=false; document.body.style.cursor='none'; connectWS(); }
+function reconnectWS(){
+  if(ws) ws.close();
+  demoMode=false;
+  webcamMode=false;
+  stopCam('A'); stopCam('B');
+  webcamPlayers={};
+  document.getElementById('webcamSelectRow').style.display='none';
+  document.getElementById('webcamSelectRow2').style.display='none';
+  document.getElementById('webcamModeRow').style.display='none';
+  document.body.style.cursor='none';
+  connectWS();
+}
 
 function startDemoMode(){
   demoMode = true;
@@ -882,6 +921,240 @@ preloadAll(() => {
   renderAttractIcons();
   renderPrizeChips();
 });
+
+// ══════════════════════════════════════════════
+//  WEBCAM MODE (단순 모션 감지 — 1대/2대 지원)
+// ══════════════════════════════════════════════
+const MOTION_COLS = 8;
+const MOTION_THRESHOLD = 30;
+const MOTION_MIN_PIXELS = 50;
+
+let camA = { video: null, canvas: null, ctx: null, prevFrame: null, running: false };
+let camB = { video: null, canvas: null, ctx: null, prevFrame: null, running: false };
+let realCameras = [];
+
+async function startWebcamMode(){
+  webcamMode = true;
+  demoMode = false;
+  if(ws) ws.close();
+  setStatus('demo','● 웹캠 모드');
+
+  await initCam('A');
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    realCameras = devices.filter(d => {
+      if(d.kind !== 'videoinput') return false;
+      const name = (d.label || '').toLowerCase();
+      if(name.includes('virtual') || name.includes('mirametrix') || name.includes('obs') || name.includes('snap') || name.includes('manycam')) return false;
+      return true;
+    });
+    const opts = realCameras.map((c,i) =>
+      `<option value="${c.deviceId}">${c.label || 'Camera '+(i+1)}</option>`
+    ).join('');
+    document.getElementById('webcamSelect').innerHTML = opts;
+    document.getElementById('webcamSelect2').innerHTML = opts;
+    document.getElementById('webcamSelectRow').style.display = 'flex';
+    document.getElementById('webcamModeRow').style.display = 'flex';
+    if(document.getElementById('webcamCount').value === '2'){
+      document.getElementById('webcamSelectRow2').style.display = 'flex';
+    }
+  } catch(e){}
+
+  if(!running){
+    running = true;
+    initObjects();
+    document.getElementById('attractScreen').classList.add('hidden');
+    startTimer();
+  }
+  toggleAdmin();
+}
+
+async function initCam(label, deviceId){
+  const cam = label === 'A' ? camA : camB;
+  const videoId = label === 'A' ? 'webcamVideo' : 'webcamVideo2';
+
+  let videoEl = document.getElementById(videoId);
+  if(!videoEl){
+    videoEl = document.createElement('video');
+    videoEl.id = videoId;
+    videoEl.setAttribute('playsinline','');
+    videoEl.muted = true;
+    videoEl.style.display = 'none';
+    document.body.appendChild(videoEl);
+  }
+
+  if(!cam.canvas){
+    cam.canvas = document.createElement('canvas');
+    cam.canvas.width = 320;
+    cam.canvas.height = 240;
+    cam.canvas.style.display = 'none';
+    document.body.appendChild(cam.canvas);
+    cam.ctx = cam.canvas.getContext('2d', {willReadFrequently: true});
+  }
+
+  if(videoEl.srcObject){
+    videoEl.srcObject.getTracks().forEach(t => t.stop());
+    videoEl.srcObject = null;
+  }
+  cam.prevFrame = null;
+  cam.running = false;
+
+  const constraints = { video: deviceId ? { deviceId: { exact: deviceId } } : true };
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    videoEl.srcObject = stream;
+    cam.video = videoEl;
+
+    const topPos = label === 'A' ? '50px' : '210px';
+    const borderCol = label === 'A' ? 'rgba(155,89,255,.5)' : 'rgba(57,255,20,.5)';
+    videoEl.style.cssText = `display:block;position:fixed;top:${topPos};right:20px;width:200px;height:150px;z-index:300;opacity:0.7;border-radius:6px;border:2px solid ${borderCol};`;
+
+    await new Promise((resolve) => {
+      videoEl.onloadedmetadata = () => {
+        videoEl.play().then(resolve).catch(resolve);
+      };
+    });
+    console.log(`[WEBCAM-${label}] 시작`, videoEl.videoWidth, 'x', videoEl.videoHeight);
+
+    cam.running = true;
+    startMotionDetect(label);
+
+  } catch(e){
+    console.error(`[WEBCAM-${label}] 오류:`, e);
+    alert(`카메라 ${label}를 열 수 없습니다: ` + e.message);
+  }
+}
+
+function startMotionDetect(label){
+  const cam = label === 'A' ? camA : camB;
+  const dualMode = document.getElementById('webcamCount').value === '2';
+  const screenXStart = dualMode ? (label === 'A' ? 0 : W/2) : 0;
+  const screenXEnd = dualMode ? (label === 'A' ? W/2 : W) : W;
+  const screenW = screenXEnd - screenXStart;
+  const idPrefix = 'webcam_' + label + '_';
+
+  function detect(){
+    if(!webcamMode || !cam.running) return;
+
+    cam.ctx.drawImage(cam.video, 0, 0, 320, 240);
+    const frame = cam.ctx.getImageData(0, 0, 320, 240);
+    const data = frame.data;
+
+    if(cam.prevFrame){
+      const prev = cam.prevFrame.data;
+      const colW = Math.floor(320 / MOTION_COLS);
+      const motionCols = [];
+
+      for(let col = 0; col < MOTION_COLS; col++){
+        let diff = 0;
+        const xStart = col * colW;
+        const xEnd = xStart + colW;
+        let motionY = 0, motionCount = 0;
+
+        for(let y = 0; y < 240; y++){
+          for(let x = xStart; x < xEnd; x++){
+            const i = (y * 320 + x) * 4;
+            const d = Math.abs(data[i] - prev[i]) +
+                      Math.abs(data[i+1] - prev[i+1]) +
+                      Math.abs(data[i+2] - prev[i+2]);
+            if(d > MOTION_THRESHOLD){
+              diff++;
+              motionY += y;
+              motionCount++;
+            }
+          }
+        }
+        if(diff > MOTION_MIN_PIXELS){
+          motionCols.push({ col, diff, avgY: motionCount > 0 ? motionY/motionCount : 120 });
+        }
+      }
+
+      const seenWebcam = new Set();
+      const groups = [];
+      let cg = null;
+      for(const mc of motionCols){
+        if(!cg || mc.col - cg.lastCol > 1){
+          cg = { cols: [mc], totalY: mc.avgY, lastCol: mc.col };
+          groups.push(cg);
+        } else {
+          cg.cols.push(mc);
+          cg.totalY += mc.avgY;
+          cg.lastCol = mc.col;
+        }
+      }
+
+      groups.slice(0, 3).forEach((g, i) => {
+        const id = idPrefix + i;
+        const avgCol = g.cols.reduce((s,c) => s + c.col, 0) / g.cols.length;
+        const avgY = g.totalY / g.cols.length;
+        const sx = screenXStart + (1 - (avgCol + 0.5) / MOTION_COLS) * screenW;
+        const sy = (avgY / 240) * H;
+        updatePlayerPos(id, sx, sy);
+        webcamPlayers[id] = true;
+        seenWebcam.add(id);
+      });
+
+      Object.keys(webcamPlayers).forEach(id => {
+        if(id.startsWith(idPrefix) && !seenWebcam.has(id)){
+          removePlayer(id);
+          delete webcamPlayers[id];
+        }
+      });
+    }
+
+    cam.prevFrame = frame;
+    setTimeout(detect, 150);
+  }
+  detect();
+}
+
+function switchWebcam(){
+  const deviceId = document.getElementById('webcamSelect').value;
+  if(deviceId) initCam('A', deviceId);
+}
+
+function switchWebcam2(){
+  const deviceId = document.getElementById('webcamSelect2').value;
+  if(deviceId) initCam('B', deviceId);
+}
+
+document.getElementById('webcamCount').addEventListener('change', function(){
+  const dual = this.value === '2';
+  document.getElementById('webcamSelectRow2').style.display = dual ? 'flex' : 'none';
+  if(dual && webcamMode){
+    const devId = document.getElementById('webcamSelect2').value;
+    initCam('B', devId || undefined);
+  } else {
+    stopCam('B');
+  }
+});
+
+function stopCam(label){
+  const cam = label === 'A' ? camA : camB;
+  cam.running = false;
+  cam.prevFrame = null;
+  const videoId = label === 'A' ? 'webcamVideo' : 'webcamVideo2';
+  const videoEl = document.getElementById(videoId);
+  if(videoEl && videoEl.srcObject){
+    videoEl.srcObject.getTracks().forEach(t => t.stop());
+    videoEl.srcObject = null;
+    videoEl.style.display = 'none';
+  }
+  const prefix = 'webcam_' + label + '_';
+  Object.keys(webcamPlayers).forEach(id => {
+    if(id.startsWith(prefix)){ removePlayer(id); delete webcamPlayers[id]; }
+  });
+}
+
+function toggleWebcamPreview(){
+  const show = document.getElementById('webcamPreview').value === '1';
+  ['webcamVideo','webcamVideo2'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el && el.srcObject) el.style.display = show ? 'block' : 'none';
+  });
+}
 
 autoLoadSettings();
 changeBG();
