@@ -385,24 +385,24 @@ class Obj{
     this.glowH = Math.random() * 360;
   }
 
-  update(){
+  update(dt){
+    dt = dt || 1;
     const s = S();
-    const spd = s.speed;
 
     // 좌우 흔들림 (부드러운 사인파 — 직접 x에 적용, vx 떨림 방지)
-    this.phase += 0.01;
+    this.phase += 0.01 * dt;
     const swayOffset = Math.sin(this.phase) * s.sway * 0.4;
 
-    // 중력 낙하 (일정 속도, 가속 없음 — 안정적)
-    this.x += swayOffset;
-    this.y += this.vy;
+    // 중력 낙하 (일정 속도, deltaTime 적용 — 프레임 독립)
+    this.x += swayOffset * dt;
+    this.y += this.vy * dt;
 
     // 좌우 경계
     if(this.x < 30) this.x = 30;
     if(this.x > W - 30) this.x = W - 30;
 
-    this.rot += this.rotV;
-    this.pulse += 0.025;
+    this.rot += this.rotV * dt;
+    this.pulse += 0.025 * dt;
 
     // 바닥 도달 시 리스폰
     if(this.y > H + 80) this.spawn(false);
@@ -711,10 +711,14 @@ function spawnParticles(x, y, col){
 }
 
 // ── GAME LOOP ──
-function loop(){
+let lastTime = 0;
+function loop(timestamp){
+  if(!lastTime) lastTime = timestamp;
+  const dt = Math.min((timestamp - lastTime) / 16.667, 3); // 60fps 기준 정규화, 최대 3프레임 보정
+  lastTime = timestamp;
   gc.clearRect(0, 0, W, H);
   if(running){
-    objects.forEach(o => { o.update(); o.draw(); });
+    objects.forEach(o => { o.update(dt); o.draw(); });
   }
   requestAnimationFrame(loop);
 }
