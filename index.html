@@ -15,13 +15,14 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Noto Sans KR',sans
 canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointer-events:none;}
 
 /* BAG MASK */
-#bagMask{position:fixed;top:0;left:-2%;width:104%;height:100%;z-index:25;pointer-events:none;
+#bagMask{position:fixed;top:-3%;left:-2%;width:104%;height:106%;z-index:25;pointer-events:none;
   background-image:url('보라쇼핑백마스크.png');
   background-size:cover;
   background-position:center top;
   background-repeat:no-repeat;
-  animation:bagSway 3s ease-in-out infinite;}
-@keyframes bagSway{0%,100%{transform:translateX(0)}50%{transform:translateX(2%)}}
+  transform-origin:center top;
+  animation:bagSway 2s ease-in-out infinite;}
+@keyframes bagSway{0%,100%{transform:translateX(-1.5%) rotate(-1.2deg)}50%{transform:translateX(1.5%) rotate(1.2deg)}}
 
 /* TIMER */
 #timerDisplay{position:fixed;top:12px;left:50%;transform:translateX(-50%);font-family:'Bebas Neue',sans-serif;font-size:clamp(24px,3vw,48px);letter-spacing:.15em;color:var(--yellow);z-index:200;pointer-events:none;text-shadow:0 0 20px rgba(255,230,0,.5);display:none;}
