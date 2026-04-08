@@ -471,6 +471,7 @@ function removePlayer(id){
 function updatePlayerPos(id, x, y){
   const p = getOrCreatePlayer(id);
   p.x = x; p.y = y;
+  if(demoMode) p.el.style.transition = 'none';
   p.el.style.left = x + 'px';
   p.el.style.top = y + 'px';
   checkHits(p);
