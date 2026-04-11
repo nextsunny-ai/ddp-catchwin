@@ -149,7 +149,9 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
   <div class="ap-title">ADMIN PANEL</div>
 
   <div class="ap-sec">WebSocket 연결</div>
+  <div class="ap-row"><label>서버 IP</label><input type="text" id="wsHost" value="localhost" style="width:140px;"></div>
   <div class="ap-row"><label>서버 포트</label><input type="number" id="wsPort" value="8765" min="1000" max="9999"></div>
+  <div class="ap-info">* 다른 PC에서 라이다 서버 실행 시 해당 PC의 IP 입력<br>예: 192.168.0.1 (같은 네트워크/LAN 케이블)</div>
   <button class="ap-btn" onclick="reconnectWS()">재연결 (라이다)</button>
   <button class="ap-btn" onclick="startDemoMode()">데모모드 (마우스)</button>
   <button class="ap-btn" style="background:rgba(155,89,255,.15);border-color:rgba(155,89,255,.4);color:#9B59FF;" onclick="startWebcamMode()">웹캠 모드</button>
@@ -232,7 +234,22 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
   <div class="ap-row"><label>감지영역 X끝(m)</label><input type="number" id="lidarX2" value="3.0" step="0.5"></div>
   <div class="ap-row"><label>감지영역 Y시작(m)</label><input type="number" id="lidarY1" value="0.5" step="0.5"></div>
   <div class="ap-row"><label>감지영역 Y끝(m)</label><input type="number" id="lidarY2" value="5.0" step="0.5"></div>
-  <div class="ap-info">* X: 좌우 범위, Y: 라이다~화면 거리 범위</div>
+  <div class="ap-row"><label>X축 반전</label>
+    <select id="mirrorX" style="background:#1a1830;color:#F2EDE4;border:1px solid rgba(242,237,228,.15);">
+      <option value="0" selected>정상</option>
+      <option value="1">반전 (센서가 화면쪽)</option>
+    </select>
+  </div>
+  <div class="ap-row"><label>Y축 반전</label>
+    <select id="mirrorY" style="background:#1a1830;color:#F2EDE4;border:1px solid rgba(242,237,228,.15);">
+      <option value="0" selected>정상</option>
+      <option value="1">반전</option>
+    </select>
+  </div>
+  <div class="ap-info">* X: 좌우 범위, Y: 라이다~화면 거리 범위<br>* 센서가 화면쪽에 있으면 X축 반전 켜기</div>
+  <button class="ap-btn" style="background:rgba(52,152,219,.15);border-color:rgba(52,152,219,.4);color:#3498db;" onclick="sendLidarCommand('calibrate')">배경 스캔 (고정물체 제거)</button>
+  <button class="ap-btn" style="background:rgba(231,76,60,.15);border-color:rgba(231,76,60,.4);color:#e74c3c;" onclick="sendLidarCommand('reset')">라이다 리셋</button>
+  <div class="ap-info">* 배경 스캔: 사람 없을 때 눌러주세요. 선반/테이블 등 고정물체를 무시합니다.<br>* 라이다 리셋: 센서가 이상할 때 재연결합니다.</div>
 
   <div class="ap-sec">테스트</div>
   <button class="ap-btn" onclick="testWin(1)">1등 강제 당첨</button>
@@ -509,9 +526,23 @@ function updatePlayerPos(id, x, y){
 // ── LIDAR COORDINATE MAPPING ──
 function lidarToScreen(lx, ly){
   const s = S();
-  const px = ((lx - s.lx1) / (s.lx2 - s.lx1)) * W;
-  const py = ((ly - s.ly1) / (s.ly2 - s.ly1)) * H;
+  const mirrorX = document.getElementById('mirrorX').value === '1';
+  const mirrorY = document.getElementById('mirrorY').value === '1';
+  let px = ((lx - s.lx1) / (s.lx2 - s.lx1)) * W;
+  let py = ((ly - s.ly1) / (s.ly2 - s.ly1)) * H;
+  if(mirrorX) px = W - px;
+  if(mirrorY) py = H - py;
   return { x: Math.max(0,Math.min(W,px)), y: Math.max(0,Math.min(H,py)) };
+}
+
+function sendLidarCommand(cmd){
+  if(ws && ws.readyState === WebSocket.OPEN){
+    ws.send(JSON.stringify({command: cmd}));
+    const msg = cmd === 'calibrate' ? '배경 스캔 요청 전송! 5초간 사람 없는 상태 유지하세요.' : '라이다 리셋 요청 전송!';
+    alert(msg);
+  } else {
+    alert('라이다 서버에 연결되어 있지 않습니다.');
+  }
 }
 
 // ── WEBSOCKET ──
@@ -521,8 +552,9 @@ let webcamMode = false;
 let webcamPlayers = {};
 
 function connectWS(){
+  const host = document.getElementById('wsHost').value || 'localhost';
   const port = document.getElementById('wsPort').value || 8765;
-  const url = `ws://localhost:${port}`;
+  const url = `ws://${host}:${port}`;
   setStatus('disconnected','● 연결 시도중...');
   try{
     ws = new WebSocket(url);
@@ -875,11 +907,14 @@ function saveSettings(){
     winSize: document.getElementById('winSize').value,
     cursorSize: document.getElementById('cursorSize').value,
     cooldown: document.getElementById('cooldown').value,
+    wsHost: document.getElementById('wsHost').value,
     wsPort: document.getElementById('wsPort').value,
     lidarX1: document.getElementById('lidarX1').value,
     lidarX2: document.getElementById('lidarX2').value,
     lidarY1: document.getElementById('lidarY1').value,
     lidarY2: document.getElementById('lidarY2').value,
+    mirrorX: document.getElementById('mirrorX').value,
+    mirrorY: document.getElementById('mirrorY').value,
   };
   localStorage.setItem('ultra_catch_settings', JSON.stringify(settings));
   alert('설정이 저장되었습니다!');
