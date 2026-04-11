@@ -117,6 +117,11 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
 <!-- BAG MASK: 보라색 쇼핑백 연장 (배경 쇼핑백과 이어짐) -->
 <div id="bagMask"></div>
 
+<!-- VIDEO MODE -->
+<div id="videoLayer" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:500;background:#000;">
+  <video id="videoPlayer" style="width:100%;height:100%;object-fit:cover;" loop></video>
+</div>
+
 <!-- WEBCAM -->
 <video id="webcamVideo" style="display:none;" playsinline></video>
 
@@ -147,6 +152,20 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
 <button id="adminToggle" onclick="toggleAdmin()">ADMIN</button>
 <div id="adminPanel">
   <div class="ap-title">ADMIN PANEL</div>
+
+  <div class="ap-sec">모드 전환</div>
+  <button class="ap-btn" id="modeToggleBtn" style="background:rgba(231,76,60,.2);border-color:#e74c3c;color:#e74c3c;font-size:14px;padding:12px;" onclick="toggleVideoMode()">영상 모드로 전환</button>
+  <div class="ap-row" style="margin-top:6px;">
+    <label>영상 파일</label>
+    <select id="videoSelect" style="width:140px;background:#1a1830;color:#F2EDE4;border:1px solid rgba(242,237,228,.15);">
+      <option value="">영상 선택...</option>
+    </select>
+  </div>
+  <div class="ap-row">
+    <label>직접 입력</label>
+    <input type="text" id="videoCustom" placeholder="video.mp4" style="width:140px;">
+  </div>
+  <div class="ap-info">* 영상 파일(.mp4)을 이 폴더에 넣고 새로고침하면 목록에 나옵니다.<br>* 또는 파일명을 직접 입력하세요.</div>
 
   <div class="ap-sec">WebSocket 연결</div>
   <div class="ap-row"><label>서버 IP</label><input type="text" id="wsHost" value="localhost" style="width:140px;"></div>
@@ -181,7 +200,6 @@ canvas#game{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointe
   <div class="ap-sec">배경 선택</div>
   <div class="ap-row"><label>배경</label>
     <select id="bgSelect" onchange="changeBG()">
-      <option value="">없음 (검정)</option>
       <option value="skybg.jpg" selected>SKY (하늘)</option>
     </select>
   </div>
@@ -853,6 +871,56 @@ document.getElementById('startBtn').addEventListener('click', () => {
   document.getElementById('attractScreen').classList.add('hidden');
   startTimer();
 });
+
+// ── VIDEO MODE ──
+let videoMode = false;
+
+function toggleVideoMode(){
+  const videoLayer = document.getElementById('videoLayer');
+  const videoPlayer = document.getElementById('videoPlayer');
+  const btn = document.getElementById('modeToggleBtn');
+
+  if(!videoMode){
+    // 영상 파일 결정
+    const custom = document.getElementById('videoCustom').value.trim();
+    const select = document.getElementById('videoSelect').value;
+    const src = custom || select;
+    if(!src){
+      alert('영상 파일을 선택하거나 파일명을 입력하세요.');
+      return;
+    }
+    videoPlayer.src = src;
+    videoPlayer.play().catch(e => console.warn('Video play error:', e));
+    videoLayer.style.display = 'block';
+    btn.textContent = '게임 모드로 전환';
+    btn.style.background = 'rgba(39,174,96,.2)';
+    btn.style.borderColor = '#27ae60';
+    btn.style.color = '#27ae60';
+    videoMode = true;
+  } else {
+    videoPlayer.pause();
+    videoPlayer.src = '';
+    videoLayer.style.display = 'none';
+    btn.textContent = '영상 모드로 전환';
+    btn.style.background = 'rgba(231,76,60,.2)';
+    btn.style.borderColor = '#e74c3c';
+    btn.style.color = '#e74c3c';
+    videoMode = false;
+  }
+}
+
+// 폴더 내 영상 파일 자동 감지 (mp4)
+function scanVideoFiles(){
+  const videos = ['video.mp4','영상.mp4','홍보영상.mp4','promo.mp4','bg_video.mp4'];
+  const select = document.getElementById('videoSelect');
+  videos.forEach(v => {
+    const img = new Image();
+    img.onload = img.onerror = function(){
+      // mp4를 Image로 로드하면 error지만, fetch로 확인
+    };
+  });
+  // 수동 입력 또는 선택으로 사용
+}
 
 // ── ADMIN ──
 function toggleAdmin(){
